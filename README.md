@@ -292,6 +292,15 @@ change the text of a query that was already prepared, it can only be bound with
 different parameters.
 
 ___
+
+### Raw SQL
+
+Although using raw SQL defeats the point of using an ORM library, not every feature
+is available yet. Raw SQL can be used with the connection object like so:
+```cpp
+connection->exec("CREATE INDEX `some_text_idx` ON `objects` (`some_text`)")
+```
+___
 ### Error handing
 There are five types of exceptions that are intentionally thrown from within
 the `zxorm` library:

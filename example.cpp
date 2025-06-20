@@ -67,6 +67,9 @@ int main (void) {
      * );
      */
 
+    // create an index on the name column using raw SQL (index is not supported yet)
+    connection.exec("CREATE INDEX IF NOT EXISTS name_idx ON `students` (`name`)");
+
     // Clear out any old data
     connection.truncate<Student>();
 
