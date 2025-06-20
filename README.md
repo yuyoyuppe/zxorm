@@ -72,6 +72,7 @@ add_subdirectory("./zxorm")
 ```
 or
 ```cmake
+include(FetchContent)
 FetchContent_Declare(
   zxorm
   GIT_REPOSITORY https://github.com/crabmandable/zxorm.git
