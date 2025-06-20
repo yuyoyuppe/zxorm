@@ -6,6 +6,7 @@
 * file, You can obtain one at https://mozilla.org/MPL/2.0/.
 */
 #pragma once
+#include <algorithm>
 #include <sqlite3.h>
 #include <type_traits>
 #include <variant>
