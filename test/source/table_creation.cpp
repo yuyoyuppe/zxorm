@@ -45,6 +45,14 @@ using table_three_t = Table<"three", Object,
     Column<"someOptionaBuffer", &Object::some_optional_buffer>
         >;
 
+using table_without_primary_key_t = Table<"without_primary", Object,
+    Column<"text", &Object::some_text, Unique<conflict_t::replace>>,
+    Column<"float", &Object::some_float>,
+    Column<"bool", &Object::some_bool>,
+    Column<"some_id", &Object::some_id >,
+    Column<"some_optional", &Object::some_optional>,
+    Column<"someOptionaBuffer", &Object::some_optional_buffer>
+        >;
 
 class TableCreationTest : public ::testing::Test {
     protected:
@@ -97,4 +105,12 @@ TEST_F(TableCreationTest, AllOrNothingTransaction) {
 
     auto count = my_conn->count_tables();
     ASSERT_EQ(count, 0);
+}
+
+TEST_F(TableCreationTest, TableWithoutPrimaryKey) {
+    auto my_conn = make_connection<table_without_primary_key_t>();
+    my_conn->create_tables(false);
+
+    auto count = my_conn->count_tables();
+    ASSERT_EQ(count, 1);
 }
