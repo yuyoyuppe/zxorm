@@ -34,6 +34,9 @@ target_compile_features(zxorm_test PRIVATE cxx_std_20)
 
 add_test(NAME zxorm_test COMMAND zxorm_test)
 
+add_executable(example ${CMAKE_CURRENT_SOURCE_DIR}/../example.cpp)
+target_link_libraries(example zxorm::zxorm)
+
 # ---- End-of-file commands ----
 
 add_folders(Test)
