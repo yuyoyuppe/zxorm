@@ -51,7 +51,7 @@ namespace zxorm {
                 const auto it = std::find(answers.begin(), answers.end(), true);
 
                 if (it == answers.end()) return -1;
-                return std::distance(answers.begin(), it);
+                return static_cast<int>(std::distance(answers.begin(), it));
             }
 
             public:
@@ -107,7 +107,7 @@ class Table {
             using type = typename std::tuple_element<column_idx, std::tuple<Column...>>::type;
         };
 
-        static constexpr int n_columns = std::tuple_size<std::tuple<Column...>>();
+        static constexpr size_t n_columns = std::tuple_size<std::tuple<Column...>>();
         static constexpr bool has_primary_key = any_of<Column::is_primary_key...>;
 
         using primary_key_t = typename find_primary_key<Column...>::type;
@@ -169,10 +169,10 @@ class Table {
             ss << "INSERT INTO `" << table_name.value << "` (";
 
             // used to tell us when to insert a NULL for the auto increment column
-            bool auto_inc_idx = -1;
+            size_t auto_inc_idx = n_columns;
 
             std::apply([&]<typename... U>(const U&...) {
-                int i = 0;
+                size_t i = 0;
                 ([&]() {
                     if constexpr (U::is_auto_inc_column) {
                         auto_inc_idx = i;
@@ -192,11 +192,11 @@ class Table {
             for (size_t i = 0; i < n_rows; i++) {
                 std::ostringstream val;
                 val << "(";
-                for (size_t i = 0; i < n_columns; i++) {
+                for (size_t column_idx = 0; column_idx < n_columns; column_idx++) {
                     // auto inc column gets a null
-                    val << (i == auto_inc_idx ? "NULL" : "?");
+                    val << (column_idx == auto_inc_idx ? "NULL" : "?");
                     // last column needs to close the paren
-                    val << (i == n_columns - 1 ? "), " : ", ");
+                    val << (column_idx == n_columns - 1 ? "), " : ", ");
                 }
 
                 auto v = val.str();
