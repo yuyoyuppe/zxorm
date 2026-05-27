@@ -115,7 +115,7 @@ namespace zxorm {
 
         static auto& getter(auto& obj) { return obj.*M; };
         static const auto& getter(const auto& obj) { return obj.*M; };
-        static void setter(auto& obj, auto arg) { obj.*M = arg; };
+        static void setter(auto& obj, auto arg) { obj.*M = static_cast<member_t>(arg); };
 
         static std::string constraint_creation_query() {
             return __constraint_t_detail::constraint_creation_query(constraints_t{});
@@ -193,7 +193,7 @@ namespace zxorm {
         static constexpr auto name = column_name;
 
         static decltype(auto) getter(auto& obj) { return (obj.*Getter)(); };
-        static void setter(auto& obj, auto arg) { (obj.*Setter)(arg); };
+        static void setter(auto& obj, auto arg) { (obj.*Setter)(static_cast<member_t>(arg)); };
 
         static std::string constraint_creation_query() {
             return __constraint_t_detail::constraint_creation_query(constraints_t{});

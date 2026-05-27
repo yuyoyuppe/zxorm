@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstring>
 #include <iterator>
+#include <limits>
 #include <optional>
 #include <type_traits>
 #include <memory>
@@ -33,6 +34,14 @@ namespace zxorm {
         size_t _step_count = 0;
         bool _done = false;
 
+        static int sqlite_index(size_t idx)
+        {
+            if (idx > static_cast<size_t>(std::numeric_limits<int>::max())) {
+                throw InternalError("SQLite index exceeds int range");
+            }
+            return static_cast<int>(idx);
+        }
+
         static inline void log(const std::weak_ptr<Logger>& logger, log_level level, const std::string_view& msg) {
             auto unwrapped = logger.lock();
             if (unwrapped) {
@@ -47,7 +56,7 @@ namespace zxorm {
             log(_logger, log_level::Debug, query.c_str());
 
             sqlite3_stmt* stmt = nullptr;
-            int result = sqlite3_prepare_v2(handle, query.c_str(), query.size() + 1, &stmt, nullptr);
+            int result = sqlite3_prepare_v2(handle, query.c_str(), sqlite_index(query.size() + 1), &stmt, nullptr);
             if (result != SQLITE_OK || !stmt) {
                 auto err = SQLExecutionError("Unable to initialize statement", handle);
                 log(_logger, log_level::Error, err);
@@ -90,12 +99,12 @@ namespace zxorm {
             // bindings start at 1 :(
             assert(idx != 0);
             using unwrapped_t = typename remove_optional<T>::type;
-            const unwrapped_t* unwrapped;
+            const unwrapped_t* unwrapped = nullptr;
             int result = SQLITE_OK;
             bool bound_null = false;
             if constexpr (ignore_qualifiers::is_optional<T>()) {
                 if (!param.has_value()) {
-                    result = sqlite3_bind_null(_stmt.get(), idx);
+                    result = sqlite3_bind_null(_stmt.get(), sqlite_index(idx));
                     bound_null = true;
                 } else {
                     unwrapped = &param.value();
@@ -106,12 +115,12 @@ namespace zxorm {
 
             if (!bound_null) {
                 if constexpr (std::is_floating_point_v<unwrapped_t>) {
-                    result = sqlite3_bind_double(_stmt.get(), idx, *unwrapped);
+                    result = sqlite3_bind_double(_stmt.get(), sqlite_index(idx), *unwrapped);
                 } else {
-                    if (sizeof(T) <= 4) {
-                        result = sqlite3_bind_int(_stmt.get(), idx, *unwrapped);
+                    if (sizeof(unwrapped_t) <= 4) {
+                        result = sqlite3_bind_int(_stmt.get(), sqlite_index(idx), *unwrapped);
                     } else {
-                        result = sqlite3_bind_int64(_stmt.get(), idx, *unwrapped);
+                        result = sqlite3_bind_int64(_stmt.get(), sqlite_index(idx), *unwrapped);
                     }
                 }
             }
@@ -131,7 +140,7 @@ namespace zxorm {
 
             if constexpr (ignore_qualifiers::is_optional<T>()) {
                 if (!param.has_value()) {
-                    result = sqlite3_bind_null(_stmt.get(), idx);
+                    result = sqlite3_bind_null(_stmt.get(), sqlite_index(idx));
                     bound_null = true;
                 }
             }
@@ -145,9 +154,9 @@ namespace zxorm {
                 std::memcpy(_blob_bindings[idx].data(), param_to_bind.data(), len);
 
                 if constexpr (ignore_qualifiers::is_string<T>() || ignore_qualifiers::is_string_view<T>()) {
-                    result = sqlite3_bind_text(_stmt.get(), idx, (char*)_blob_bindings[idx].data(), _blob_bindings[idx].size(), nullptr);
+                    result = sqlite3_bind_text(_stmt.get(), sqlite_index(idx), (char*)_blob_bindings[idx].data(), sqlite_index(_blob_bindings[idx].size()), nullptr);
                 } else {
-                    result = sqlite3_bind_blob(_stmt.get(), idx, _blob_bindings[idx].data(), _blob_bindings[idx].size(), nullptr);
+                    result = sqlite3_bind_blob(_stmt.get(), sqlite_index(idx), _blob_bindings[idx].data(), sqlite_index(_blob_bindings[idx].size()), nullptr);
                 }
             }
 
@@ -204,7 +213,7 @@ namespace zxorm {
         template<ContinuousContainer T>
         void read_column(size_t idx, T& out_param) {
             auto out = MetaContainer<T>(out_param);
-            int data_type = sqlite3_column_type(_stmt.get(), idx);
+            int data_type = sqlite3_column_type(_stmt.get(), sqlite_index(idx));
             switch(data_type) {
                 case SQLITE_INTEGER:
                 case SQLITE_FLOAT: {
@@ -212,8 +221,8 @@ namespace zxorm {
                 }
                 case SQLITE_TEXT:
                 case SQLITE_BLOB: {
-                    const void* data = sqlite3_column_blob(_stmt.get(), idx);
-                    size_t len = sqlite3_column_bytes(_stmt.get(), idx);
+                    const void* data = sqlite3_column_blob(_stmt.get(), sqlite_index(idx));
+                    size_t len = static_cast<size_t>(sqlite3_column_bytes(_stmt.get(), sqlite_index(idx)));
                     if (!out.resize(len)) {
                         throw InternalError("Container does not have enough space to read column data");
                     }
@@ -234,28 +243,41 @@ namespace zxorm {
 
         template<ArithmeticT T>
         void read_column(size_t idx, T& out_param) {
-            int data_type = sqlite3_column_type(_stmt.get(), idx);
+            int data_type = sqlite3_column_type(_stmt.get(), sqlite_index(idx));
+            using unwrapped_t = typename remove_optional<T>::type;
             switch(data_type) {
                 case SQLITE_INTEGER: {
-                    if (sizeof(out_param) <= 4) {
-                        out_param = static_cast<T>(sqlite3_column_int(_stmt.get(), idx));
+                    if constexpr (ignore_qualifiers::is_optional<T>()) {
+                        if (sizeof(unwrapped_t) <= 4) {
+                            out_param = static_cast<unwrapped_t>(sqlite3_column_int(_stmt.get(), sqlite_index(idx)));
+                        } else {
+                            out_param = static_cast<unwrapped_t>(sqlite3_column_int64(_stmt.get(), sqlite_index(idx)));
+                        }
                     } else {
-                        out_param = static_cast<T>(sqlite3_column_int64(_stmt.get(), idx));
+                        if (sizeof(T) <= 4) {
+                            out_param = static_cast<T>(sqlite3_column_int(_stmt.get(), sqlite_index(idx)));
+                        } else {
+                            out_param = static_cast<T>(sqlite3_column_int64(_stmt.get(), sqlite_index(idx)));
+                        }
                     }
                     break;
                 }
                 case SQLITE_FLOAT: {
-                    out_param = static_cast<T>(sqlite3_column_double(_stmt.get(), idx));
+                    if constexpr (ignore_qualifiers::is_optional<T>()) {
+                        out_param = static_cast<unwrapped_t>(sqlite3_column_double(_stmt.get(), sqlite_index(idx)));
+                    } else {
+                        out_param = static_cast<T>(sqlite3_column_double(_stmt.get(), sqlite_index(idx)));
+                    }
                     break;
                 }
                 case SQLITE_TEXT:
                 case SQLITE_BLOB: {
                     throw InternalError("Tried to read an arithmetic column into a container");
-                    size_t len = sqlite3_column_bytes(_stmt.get(), idx);
+                    size_t len = static_cast<size_t>(sqlite3_column_bytes(_stmt.get(), sqlite_index(idx)));
                     if (len > sizeof(T)) {
                         throw InternalError("Param does not have enough space to fit column contents");
                     }
-                    const void* data = sqlite3_column_blob(_stmt.get(), idx);
+                    const void* data = sqlite3_column_blob(_stmt.get(), sqlite_index(idx));
                     std::memcpy(&out_param, data, len);
                     break;
                 }

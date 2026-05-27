@@ -599,7 +599,7 @@ namespace zxorm {
         exec("BEGIN TRANSACTION;");
         try {
             run();
-        } catch(const zxorm::Error& err) {
+        } catch(const zxorm::Error&) {
             exec("ROLLBACK TRANSACTION;");
             throw;
         }
