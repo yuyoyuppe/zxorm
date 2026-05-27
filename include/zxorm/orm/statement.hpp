@@ -276,13 +276,6 @@ namespace zxorm {
                 case SQLITE_TEXT:
                 case SQLITE_BLOB: {
                     throw InternalError("Tried to read an arithmetic column into a container");
-                    size_t len = static_cast<size_t>(sqlite3_column_bytes(_stmt.get(), sqlite_index(idx)));
-                    if (len > sizeof(T)) {
-                        throw InternalError("Param does not have enough space to fit column contents");
-                    }
-                    const void* data = sqlite3_column_blob(_stmt.get(), sqlite_index(idx));
-                    std::memcpy(&out_param, data, len);
-                    break;
                 }
                 case SQLITE_NULL: {
                     if constexpr (ignore_qualifiers::is_optional<T>()) {
