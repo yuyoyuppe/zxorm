@@ -66,7 +66,7 @@ namespace zxorm {
             const auto it = std::find(a.begin(), a.end(), true);
 
             if (it == a.end()) return -1;
-            return std::distance(a.begin(), it);
+            return static_cast<int>(std::distance(a.begin(), it));
         }
 
         public:
